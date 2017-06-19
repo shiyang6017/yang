@@ -1,6 +1,7 @@
 #include "time_stamp.h"
 #include <iostream>
 using namespace yang;
+
 int main() {
     TimeStamp timeStamp(TimeStamp::current());
     std::cout << timeStamp.toFormattedString() << std::endl;

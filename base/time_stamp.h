@@ -1,9 +1,10 @@
-#ifndef TIME_STAMP_H
-#define TIME_STAMP_H
+#ifndef _TIME_STAMP_H
+#define _TIME_STAMP_H
 
 #include <stdint.h>
-#include <boost/operators.hpp>
 #include <string>
+
+#include <boost/operators.hpp>
 
 namespace yang {
 
@@ -11,16 +12,16 @@ class TimeStamp : public boost::less_than_comparable<TimeStamp> {
     const static unsigned int UsecsPerSecond = 1000 * 1000;
 
 public:
-    TimeStamp():usecSinceEpoch_(0) {}
+    TimeStamp() : usecSinceEpoch_(0) {}
 
-    explicit TimeStamp(int64_t arg) : usecSinceEpoch_(arg){}
-   
+    explicit TimeStamp(int64_t arg) : usecSinceEpoch_(arg) {}
+
     std::string toFormattedString(bool showUsec = true) const;
-    
+
     int64_t getUsecSinceEpoch() const {
         return usecSinceEpoch_;
     }
-
+    /*return current time*/
     static TimeStamp current();
 
     static TimeStamp FormTimeStamp(time_t t) {
@@ -32,14 +33,20 @@ public:
         return TimeStamp(arg);
     }
 
-private: 
+private:
+    /*micro seconds since Epoch*/
     int64_t usecSinceEpoch_;
 
 };
 
+/*this is for less_than_comparable<TimeStamp> to realize operator ">=", "<=", "<", etc*/
+
 inline bool operator < (const TimeStamp& lhs, const TimeStamp& rhs) {
     return lhs.getUsecSinceEpoch() < rhs.getUsecSinceEpoch();
 }
+
+/*this is for less_than_comparable<TimeStamp> to realize operator "!=" */
+
 inline bool operator == (const TimeStamp& lhs, const TimeStamp& rhs) {
     return lhs.getUsecSinceEpoch() == rhs.getUsecSinceEpoch();
 }
