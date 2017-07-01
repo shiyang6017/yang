@@ -12,14 +12,13 @@
 
 namespace yang {
 
-namespace CurrentThread
-{
+namespace CurrentThread {
 __thread int currentTid = 0;
 __thread char tidString[32];
 __thread int tidStringLength = 6;
 
-// ptrThreadName will point to a place which has already allocated, 
-// hence it will not cause memory leakage 
+// ptrThreadName will point to a place which has already allocated,
+// hence it will not cause memory leakage
 __thread const char* ptrThreadName = "unknown";
 
 const bool sameType = std::is_same<int, pid_t>::value;
@@ -29,11 +28,11 @@ static_assert(sameType, "pid_t is not int");
 
 class SetNameForMainThread {
 public:
-     SetNameForMainThread() {
-         using namespace CurrentThread; 
-         currentTid =  CurrentThread::getCurrentTid();
-         ptrThreadName = "MainThread"; 
-     }
+    SetNameForMainThread() {
+        using namespace CurrentThread;
+        currentTid =  CurrentThread::getCurrentTid();
+        ptrThreadName = "MainThread";
+    }
 };
 
 SetNameForMainThread setNameForMainThread;
@@ -52,13 +51,13 @@ struct ThreadInfo { // use "struct"
         : stringName_(name), weakTid_(tid), func_(func) {}
 
 
-    // main content: 
+    // main content:
     //      1. set TSD for a thread : currentTid,  tidString, etc
     //      2. run main function
     //      3. handle exception
 
     void runInThread() {
-          
+
         // set currentTid,  tidString, tidStringLength in getCurrentTid()
         pid_t tid = CurrentThread::getCurrentTid();
         {
@@ -93,15 +92,15 @@ struct ThreadInfo { // use "struct"
 
 // called by pthread_create
 void* funcInPthreadCreate(void* arg) {
-    
+
     ThreadInfo* threadInfoPtr = static_cast<ThreadInfo*>(arg);
-    
+
     assert(threadInfoPtr);
 
     //std::unique_ptr<ThreadInfo> uptr(threadInfoPtr); this is better ??
-    
+
     threadInfoPtr->runInThread();
-    
+
     delete threadInfoPtr;
 
     return NULL;
@@ -144,19 +143,19 @@ Thread::Thread(ThreadFunc&& func,  const std::string& name) :
 }
 /*
 
-// stupid way to use smart pointer ....  
+// stupid way to use smart pointer ....
 // fully understand why muduo uses raw pointer!!!
 
 void Thread::run() {
     assert(!started_);
     started_ = true;
-    std::unique_ptr<ThreadInfo> 
+    std::unique_ptr<ThreadInfo>
         threadInfo(new ThreadInfo(stringName_, tid_, func_));
 
-    PCHECK( pthread_create(&pthreadId_, 
-                            NULL, 
-                            funcInPthreadCreate, 
-                            threadInfo.get()) 
+    PCHECK( pthread_create(&pthreadId_,
+                            NULL,
+                            funcInPthreadCreate,
+                            threadInfo.get())
           );
 }
 
@@ -164,20 +163,20 @@ void Thread::run() {
 
 void Thread::run() {
     assert(!started_);
-    
+
     started_ = true;
     ThreadInfo* info = new ThreadInfo(stringName_, tid_, func_);
-    
+
     assert(info);
-    int err = pthread_create(&pthreadId_, 
-                            NULL, 
-                            funcInPthreadCreate, 
-                            info);
+    int err = pthread_create(&pthreadId_,
+                             NULL,
+                             funcInPthreadCreate,
+                             info);
     if (err) {
         started_ = false;
         delete info;
         PCHECK(err);
-    } 
+    }
 }
 
 

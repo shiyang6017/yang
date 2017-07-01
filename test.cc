@@ -1,51 +1,66 @@
 #include <iostream>
-#include <string.h>
-#include <vector>
 #include <memory>
+#include <unordered_map>
 
-#include <stdio.h>
+class Observer;
 
-#include <boost/ptr_container/ptr_vector.hpp>
-
-using std::cout;
-using std::endl;
-using std::string;
-
-class Stream {
-    typedef Stream self; 
+class Subject {
 public:
-    Stream() : cur(buf) {}
-    friend std::ostream& operator << (std::ostream& os, Stream& stream) {
-        cout << stream.buf; 
-        return os;
-    }
-    template<typename T>
-    self& operator<<(T t) {
-        int len = sprintf(cur, "%d", t);
-        cur += len;
-        *cur = 0;
-        return *this;
-    }
-    template<typename T>
-    void fun(T t) {
-        cout << "typename fun" << endl;
-    }
+    void registerObserver(const std::weak_ptr<Observer> obs);
+    void unregisterObserver();
+    bool notify(const std::string& observerName);
+    void notifyall();
 private:
-
-    char buf[1024];
-    char* cur;
+    std::unordered_map<std::string, std::weak_ptr<Observer>> observers_;
 };
 
-template<>
-void Stream::fun<char>(char c) {
-    cout << "char c" << endl;
+
+class Observer : public std::enable_shared_from_this<Observer> {
+public:
+    void update() {
+        /**/
+    }
+    const std::string& getName() const {
+        return name_;
+    }
+    
+private:
+    std::string name_;
+};
+// know when to use by-ref and by-value
+void Subject::registerObserver(const std::weak_ptr<Observer> weakObs) {
+    auto shdObs = weakObs.lock();
+   
+    if (shdObs) {
+        auto name = shdObs->getName();
+        {
+            // lock
+            observers_.emplace(name, weakObs); 
+            // unlock;
+        }
+    }
 }
+
+bool Subject::notify(const std::string& observerName) {
+    //lock;
+    auto iter = observers_.find(observerName); 
+    if (iter == observers_.end()) {
+        //unlock;
+        return false;
+    }
+    auto weakObs = iter->second; 
+    auto shdObs = weakObs.lock();
+    if (shdObs) {
+        shdObs->update(); 
+    } else {
+        observers_.erase(iter); 
+    }
+    // unlock;
+    return true;
+}
+
+
+
 int main() {
-    Stream stream;
-    stream << 124;
-    stream << 'c';
-    cout << stream << endl;
-    stream.fun(1);
-    stream.fun('c');
-    return 0;
+
 }

@@ -1,21 +1,33 @@
 #include "log_stream.h"
 
+#include <boost/type_traits/is_arithmetic.hpp>
+
 #include <algorithm>
+#include <limits>
+#include <type_traits>
 
 #include <assert.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdio.h>
 
-namespace yang {
-namespace tools {
+using namespace yang;
+using namespace yang::tools;
 
-template<typename T>
+namespace yang
+{
+namespace tools
+{
+
+template <typename T>
 size_t convert(char buf[], T value)
 {
-    static const char digitsMap[] = "9876543210123456789";
-    static const char* zero = digitsMap + 9;
-    static_assert(sizeof digitsMap == 20, "digit size != 20");
+    static const char digits[] = "9876543210123456789";
+    static const char *zero = digits + 9;
+    static_assert(sizeof digits == 20, "sizeof digits != 20");
 
     T i = value;
-    char* p = buf;
+    char *p = buf;
 
     do
     {
@@ -36,17 +48,17 @@ size_t convert(char buf[], T value)
 
 size_t convertHex(char buf[], uintptr_t value)
 {
-    static const char digitsHexMap[] = "0123456789ABCDEF";
-    static_assert(sizeof digitsHexMap == 17, "digitsHex != 17");
-
+    static const char digitsHex[] = "0123456789ABCDEF";
+    static_assert(sizeof digitsHex == 17, "sizeof digitsHex != 17");
+    
     uintptr_t i = value;
-    char* p = buf;
+    char *p = buf;
 
     do
     {
         int lsd = static_cast<int>(i % 16);
         i /= 16;
-        *p++ = digitsHexMap[lsd];
+        *p++ = digitsHex[lsd];
     } while (i != 0);
 
     *p = '\0';
@@ -55,8 +67,133 @@ size_t convertHex(char buf[], uintptr_t value)
     return p - buf;
 }
 
+template class FixedBuffer<SmallBufferSize>;
+template class FixedBuffer<LargeBufferSize>;
+}
+}
+
+template <int SIZE>
+const char *FixedBuffer<SIZE>::debugString()
+{
+    *cur_ = '\0';
+    return data_;
+}
+
+template <int SIZE>
+void FixedBuffer<SIZE>::cookieStart()
+{
+}
+
+template <int SIZE>
+void FixedBuffer<SIZE>::cookieEnd()
+{
+}
+
+template <typename T>
+void LogStream::formatInteger(T v)
+{
+    if (buffer_.avail() >= kMaxNumericSize)
+    {
+        size_t len = convert(buffer_.current(), v);
+        buffer_.add(len);
+    }
+}
+
+LogStream &LogStream::operator<<(short v)
+{
+    *this << static_cast<int>(v);
+    return *this;
+}
+
+LogStream &LogStream::operator<<(unsigned short v)
+{
+    *this << static_cast<unsigned int>(v);
+    return *this;
+}
+
+LogStream &LogStream::operator<<(int v)
+{
+    formatInteger(v);
+    return *this;
+}
+
+LogStream &LogStream::operator<<(unsigned int v)
+{
+    formatInteger(v);
+    return *this;
+}
+
+LogStream &LogStream::operator<<(long v)
+{
+    formatInteger(v);
+    return *this;
+}
+
+LogStream &LogStream::operator<<(unsigned long v)
+{
+    formatInteger(v);
+    return *this;
+}
+
+LogStream &LogStream::operator<<(long long v)
+{
+    formatInteger(v);
+    return *this;
+}
+
+LogStream &LogStream::operator<<(unsigned long long v)
+{
+    formatInteger(v);
+    return *this;
+}
+
+LogStream &LogStream::operator<<(const void *p)
+{
+    uintptr_t v = reinterpret_cast<uintptr_t>(p);
+    if (buffer_.avail() >= kMaxNumericSize)
+    {
+        char *buf = buffer_.current();
+        buf[0] = '0';
+        buf[1] = 'x';
+        size_t len = convertHex(buf + 2, v);
+        buffer_.add(len + 2);
+    }
+    return *this;
+}
+
+// FIXME: replace this with Grisu3 by Florian Loitsch.
+LogStream &LogStream::operator<<(double v)
+{
+    if (buffer_.avail() >= kMaxNumericSize)
+    {
+        int len = snprintf(buffer_.current(), kMaxNumericSize, "%.12g", v);
+        buffer_.add(len);
+    }
+    return *this;
+}
+
+template <typename T>
+Fmt::Fmt(const char *fmt, T val)
+{
+    static_assert(boost::is_arithmetic<T>::value == true, 
+                 "boost::is_arithmetic<T>::value != true");
+
+    length_ = snprintf(buf_, sizeof buf_, fmt, val);
+    assert(static_cast<size_t>(length_) < sizeof buf_);
+}
+
 // Explicit instantiations
-template class FixedBuffer<kSmallBufferSize>;
-template class FixedBuffer<kLargeBufferSize>;
-}
-}
+
+template Fmt::Fmt(const char *fmt, char);
+
+template Fmt::Fmt(const char *fmt, short);
+template Fmt::Fmt(const char *fmt, unsigned short);
+template Fmt::Fmt(const char *fmt, int);
+template Fmt::Fmt(const char *fmt, unsigned int);
+template Fmt::Fmt(const char *fmt, long);
+template Fmt::Fmt(const char *fmt, unsigned long);
+template Fmt::Fmt(const char *fmt, long long);
+template Fmt::Fmt(const char *fmt, unsigned long long);
+
+template Fmt::Fmt(const char *fmt, float);
+template Fmt::Fmt(const char *fmt, double);

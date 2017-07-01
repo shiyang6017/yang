@@ -1,182 +1,192 @@
-#ifndef LOG_STREAM_H
-#define LOG_STREAM_H
+#ifndef _LOG_STREAM_H
+#define _LOG_STREAM_H
 
+#include <assert.h>
+#include <string.h>  
+#include <string>
 #include <boost/noncopyable.hpp>
 #include <boost/implicit_cast.hpp>
-#include <string>
-
-#include <string.h>
 namespace yang {
 
-namespace tools { 
-const int kSmallBufferSize = 4096;
-const int kLargeBufferSize = 4096 * 1024;
+namespace tools {
+
+const int SmallBufferSize = 4096;
+const int LargeBufferSize = 4096 * 1024;
 
 template<int SIZE>
-class FixedBuffer : boost::noncopyable
-{
-public:
-    FixedBuffer() : cur_(data_) {
-        setCookie(cookieStart);
-    }
-    ~FixedBuffer() {
-        setCookie(cookieEnd);
-    }
+class FixedBuffer : boost::noncopyable {
+ public:
+  FixedBuffer() : cur_(data_) {
+    setCookie(cookieStart);
+  }
 
-    void append(const char*  buf, size_t len) {
-        // why use implicit_cast
-        if (boost::implicit_cast<size_t>(avail()) > len) {
-            memcpy(cur_, buf, len);
-            cur_ += len;
-        }
-    }
-    int length() const {
-        return static_cast<int>(cur_ - data_);
-    }
-    int avail() const {
-        return static_cast<int>(end() - cur_);
-    }
-    void reset() {
-        cur_ = data_;
-    }
-    void bzero() {
-        ::bzero(data_, sizeof data_);
-    }
+  ~FixedBuffer() {
+    setCookie(cookieEnd);
+  }
 
-    const char* data() const {
-        return data_;
+  void append(const char* buf, size_t len) {
+    if (boost::implicit_cast<size_t>(avail()) > len) {
+      memcpy(cur_, buf, len);
+      cur_ += len;
     }
-    char* current() {
-        return cur_;
-    }
-    void add(size_t len) {
-        cur_ += len;
-    }
+  }
 
-    const char* debugString();
+  const char* data() const { 
+    return data_; 
+  }
+  int length() const { 
+    return static_cast<int>(cur_ - data_); 
+  }
 
-    void setCookie(void (*cookie)()) {
-        cookie_ = cookie;
-    }
+  // write to data_ directly
+  char* current() { 
+    return cur_; 
+  }
+  int avail() const { 
+    return static_cast<int>(end() - cur_); 
+  }
+  void add(size_t len) { 
+    cur_ += len; 
+  }
 
-    std::string toString() const {
-        return std::string(data_, length());
-    }
-private:
-    const char* end() const {
-        return data_ + sizeof data_;
-    }
+  void reset() { 
+    cur_ = data_; 
+  }
+  void bzero() { 
+    ::bzero(data_, sizeof data_); 
+  }
 
-    static void cookieStart();
-    static void cookieEnd();
+  // for used by GDB
+  const char* debugString();
+  void setCookie(void (*cookie)()) { 
+    cookie_ = cookie; 
+  }
+  // for used by unit test
+  string toString() const { 
+    return string(data_, length()); 
+  }
+  StringPiece toStringPiece() const { 
+    return StringPiece(data_, length()); 
+  }
 
-    void (*cookie_)();
-    char data_[SIZE];
-    char* cur_;
+ private:
+  const char* end() const { 
+    return data_ + sizeof data_; 
+  }
+  // Must be outline function for cookies.
+  static void cookieStart();
+  static void cookieEnd();
+
+  void (*cookie_)();
+  char data_[SIZE];
+  char* cur_;
 };
 
 }
 
 class LogStream : boost::noncopyable {
-    typedef LogStream self;
-public:
-    typedef tools::FixedBuffer<tools::kSmallBufferSize> Buffer;
-    
+  typedef LogStream self;
+ public:
+  typedef detail::FixedBuffer<detail::kSmallBuffer> Buffer;
 
-    template<typename T>
-    self& operator <<(T t);
-    
+  self& operator<<(bool v) {
+    buffer_.append(v ? "1" : "0", 1);
+    return *this;
+  }
 
-    self& operator << (short);
-    self& operator << (unsigned short);
-    self& operator << (int);
-    self& operator << (unsigned int);
-    self& operator << (long);
-    self& operator << (unsigned long);
-    self& operator << (long long);
-    self& operator << (unsigned long long);
+  self& operator<<(short);
+  self& operator<<(unsigned short);
+  self& operator<<(int);
+  self& operator<<(unsigned int);
+  self& operator<<(long);
+  self& operator<<(unsigned long);
+  self& operator<<(long long);
+  self& operator<<(unsigned long long);
 
-    self& operator << (const void*);
+  self& operator<<(const void*);
 
-    self& operator << (float v) {
-        *this << static_cast<double>(v);
-        return *this;
+  self& operator<<(float v) {
+    *this << static_cast<double>(v);
+    return *this;
+  }
+  self& operator<<(double);
+
+  self& operator<<(char v) {
+    buffer_.append(&v, 1);
+    return *this;
+  }
+
+  self& operator<<(const char* str) {
+    if (str) {
+      buffer_.append(str, strlen(str));
+    } else {
+      buffer_.append("(null)", 6);
     }
-    self& operator << (double);
+    return *this;
+  }
 
-    self& operator << (char v) {
-        buffer_.append(&v, 1);
-        return *this;
-    }
+  self& operator<<(const unsigned char* str) {
+    return operator<<(reinterpret_cast<const char*>(str));
+  }
 
-    self& operator << (const char* str) {
-        if (str) {
-            buffer_.append(str, strlen(str));
-        } else {
-            buffer_.append("(null)", 6);
-        }
+  self& operator<<(const string& v) {
+    buffer_.append(v.c_str(), v.size());
+    return *this;
+  }
 
-        return *this;
-    }
+  self& operator<<(const std::string& v) {
+    buffer_.append(v.c_str(), v.size());
+    return *this;
+  }
 
-    self& operator << (const unsigned char* str) {
-        return operator << (reinterpret_cast<const char*>(str));
-    }
+  self& operator<<(const Buffer& v) {
+    *this << v.toStringPiece();
+    return *this;
+  }
 
-    self& operator << (const std::string& v) {
-        buffer_.append(v.c_str(), v.size());
-        return *this;
-    }
+  void append(const char* data, int len) { 
+    buffer_.append(data, len); 
+  }
+  const Buffer& buffer() const { 
+    return buffer_; 
+  }
+  void resetBuffer() { 
+    buffer_.reset(); 
+  }
 
-    self& operator << (const Buffer& v)
-    {
-        *this << v.toString();
-        return *this;
-    }
+ private:
+  void staticCheck();
 
-    void append(const char* data, int len) {
-        buffer_.append(data, len);
-    }
-    const Buffer& buffer() const {
-        return buffer_;
-    }
-    void resetBuffer() {
-        buffer_.reset();
-    }
+  template<typename T>
+  void formatInteger(T);
 
-private:
-    void staticCheck();
-    template<typename T>
-    void formatInteger(T);
-    Buffer buffer_;
+  Buffer buffer_;
 
-    static const int kMaxNumericSize = 32;
+  static const int kMaxNumericSize = 32;
 };
 
-
-
 class Fmt {
-public:
-    template<typename T>
-    Fmt(const char* fmt, T val);
+ public:
+  template<typename T>
+  Fmt(const char* fmt, T val);
 
-    const char* data() const {
-        return buf_;
-    }
-    int length() const {
-        return length_;
-    }
+  const char* data() const { 
+    return buf_; 
+  }
+  int length() const { 
+    return length_; 
+  }
 
-private:
-    char buf_[32];
-    int length_;
+ private:
+  char buf_[32];
+  int length_;
 };
 
 inline LogStream& operator<<(LogStream& s, const Fmt& fmt) {
-    s.append(fmt.data(), fmt.length());
-    return s;
+  s.append(fmt.data(), fmt.length());
+  return s;
 }
 
 }
+#endif  
 
-#endif
