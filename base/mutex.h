@@ -38,7 +38,7 @@ private:
     }
 
 private:
-    pthread_mutex_t mutex_;
+    mutable pthread_mutex_t mutex_;
 };
 
 class MutexGuard : public boost::noncopyable {

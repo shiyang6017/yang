@@ -40,8 +40,8 @@ public:
     void waitForUsecond(long uSecond);
 
 private:
-    Mutex& mutex_;
-    pthread_cond_t cond_;
+    mutable Mutex& mutex_;
+    mutable pthread_cond_t cond_;
 };
 }
 #endif

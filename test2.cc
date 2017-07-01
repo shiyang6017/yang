@@ -1,22 +1,23 @@
+#include <pthread.h>
 #include <iostream>
 using namespace std;
 
-
-
-template<typename T>
-void specialFunc(const T& t) {
-    cout << t << endl;
-}
-template <typename... Args>
-void templateFunc(Args... args) {
-}
-template<typename T, typename ... Args>
-void templateFunc(const T t, Args ... args) {
-    specialFunc(t);
-    templateFunc(args...);
-}
+class Example {
+public:
+    Example() {
+        pthread_mutex_init(&mutex_, NULL);
+    }
+    void fun() const {
+        pthread_mutex_lock(&mutex_);
+        cout << "hello" << endl;
+        pthread_mutex_unlock(&mutex_);
+    }
+private:
+     pthread_mutex_t mutex_;
+};
 
 int main() {
-    templateFunc(1, 2, 3, 'a', 'b', 'c');
-    return 0;
+    const Example e;
+    e.fun();
+    return 0; 
 }
